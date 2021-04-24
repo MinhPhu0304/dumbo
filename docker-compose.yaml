@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:10
+    container_name: dev
+    environment:
+      POSTGRES_USER: "dev"
+      POSTGRES_PASSWORD: "dev"
+      PGDATA: "/var/lib/postgresql/data"
+    ports:
+      - 5432:5432
+    volumes:
+      - ./data:/var/lib/postgresql/data

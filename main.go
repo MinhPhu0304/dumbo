@@ -1,58 +1,39 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"io"
+	"database/sql"
+	"log"
 	"os"
-	"strings"
-	"time"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/pressly/goose"
 )
 
-// Naive implementation for watching file change
-func tail(filename string, out io.Writer) {
-	f, err := os.Open(filename)
+func main() {
+	err := godotenv.Load()
 	if err != nil {
-		panic(err)
+		log.Fatal("Error loading .env file")
 	}
-	defer f.Close()
-	r := bufio.NewReader(f)
-	info, err := f.Stat()
-	if err != nil {
-		panic(err)
-	}
-	oldSize := info.Size()
-	for {
-		for line, _, err := r.ReadLine(); err != io.EOF; line, _, err = r.ReadLine() {
-			if strings.Contains(string(line), "LOG") || strings.Contains(string(line), "statement") || strings.Contains(string(line), "STATEMENT") {
-				fmt.Fprintln(out, string(line))
-			}
-		}
-		pos, err := f.Seek(0, io.SeekCurrent)
-		if err != nil {
-			panic(err)
-		}
-		for {
-			time.Sleep(time.Second)
-			newinfo, err := f.Stat()
-			if err != nil {
-				panic(err)
-			}
-			newSize := newinfo.Size()
-			if newSize != oldSize {
-				if newSize < oldSize {
-					f.Seek(0, 0)
-				} else {
-					f.Seek(pos, io.SeekStart)
-				}
-				r = bufio.NewReader(f)
-				oldSize = newSize
-				break
-			}
-		}
-	}
+
+	executeDBMigration()
 }
 
-func main() {
-	tail("logs.txt", os.Stdout)
+func executeDBMigration() {
+	connStr := "postgres://" + os.Getenv("database_user") + ":" + os.Getenv("database_password") + "@" + os.Getenv("database_host") + "/" + os.Getenv("database") + "?sslmode=disable"
+	db, err := sql.Open("postgres", connStr)
+	db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Fatalf("goose: failed to close DB: %v\n", err)
+		}
+	}()
+
+	if err := goose.Up(db, "./migrations"); err != nil {
+		log.Printf("goose %v", err)
+		log.Fatalln(err)
+	}
 }

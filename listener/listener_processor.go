@@ -3,6 +3,8 @@ package listener
 import (
 	"database/sql"
 	"log"
+
+	"github.com/minhphu0304/dumbo/producer"
 )
 
 func ProcessNewStatement(db *sql.DB, statementExecuted string) {
@@ -33,8 +35,12 @@ func ProcessNewStatement(db *sql.DB, statementExecuted string) {
 		if err := row.Scan(&tableName, &jsonData, &statement); err != nil {
 			log.Fatal(err)
 		}
-		// TODO: send this to Kafka
-		log.Printf("Table: %s with data changes %s\n", tableName, jsonData)
+		kafkaMsg := &producer.DatabaseEvent{
+			TableName: tableName,
+			JsonData:  jsonData,
+			Statement: statement,
+		}
+		producer.ProduceEvent(*kafkaMsg)
 	}
 
 }
